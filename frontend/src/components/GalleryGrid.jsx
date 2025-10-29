@@ -12,6 +12,15 @@ function formatDateDisplay(dateStr) {
   return `${day} ${MONTHS[month - 1]} ${year}`
 }
 
+function formatDuration(seconds) {
+  if (!seconds || seconds <= 0) return null
+  const s = Math.floor(seconds % 60)
+  const m = Math.floor((seconds / 60) % 60)
+  const h = Math.floor(seconds / 3600)
+  const pad = (n) => String(n).padStart(2, '0')
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`
+}
+
 export function GalleryGrid({ items = [] }) {
   // Group items by date folder
   const grouped = useMemo(() => {
@@ -40,7 +49,7 @@ export function GalleryGrid({ items = [] }) {
   if (!items || items.length === 0) {
     return (
       <div className="text-center text-slate-500 dark:text-slate-400 py-8">
-        No images found for the selected dates.
+        No media found for the selected dates.
       </div>
     )
   }
@@ -68,7 +77,15 @@ export function GalleryGrid({ items = [] }) {
                 </motion.div>
                 <div>
                   <h3 className="font-semibold text-slate-800 dark:text-slate-100">{formatDateDisplay(date)}</h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">{dateItems.length} image{dateItems.length === 1 ? '' : 's'}</p>
+                  {(() => {
+                    const vids = dateItems.filter(it => it.isVideo).length
+                    const imgs = dateItems.length - vids
+                    return (
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        {imgs} {imgs === 1 ? 'image' : 'images'} • {vids} {vids === 1 ? 'video' : 'videos'}
+                      </p>
+                    )
+                  })()}
                 </div>
               </div>
             </button>
@@ -103,6 +120,12 @@ export function GalleryGrid({ items = [] }) {
                               alt={it.name}
                               className="absolute inset-0 w-full h-full object-cover"
                             />
+                            {it.isVideo && (
+                              <div className="absolute top-1.5 left-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-black/60 text-white backdrop-blur-sm">
+                                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                                {formatDuration(it.durationSeconds) || 'video'}
+                              </div>
+                            )}
                             <div className="absolute bottom-0 left-0 right-0 p-1.5 text-[11px] truncate bg-gradient-to-t from-black/60 via-black/20 to-transparent text-white opacity-0 group-hover:opacity-100 transition-opacity">
                               {it.name}
                             </div>

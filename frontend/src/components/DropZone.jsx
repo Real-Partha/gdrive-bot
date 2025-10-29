@@ -10,7 +10,7 @@ export function DropZone({ onDrop, disabled = false }) {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: onDropCallback,
-    accept: { 'image/*': [] },
+    accept: { 'image/*': [], 'video/*': [] },
     disabled,
     multiple: true,
   })
@@ -56,10 +56,10 @@ export function DropZone({ onDrop, disabled = false }) {
           </svg>
         </motion.div>
         <p className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-2">
-          {isDragActive ? 'Drop images here...' : 'Drag & drop images'}
+          {isDragActive ? 'Drop files here...' : 'Drag & drop images or videos'}
         </p>
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          or click to browse • Supports JPEG, PNG, HEIC
+          or click to browse • Supports JPEG, PNG, HEIC, MP4, MOV
         </p>
       </div>
 

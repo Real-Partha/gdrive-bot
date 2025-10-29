@@ -16,6 +16,7 @@ export default function App() {
   const location = useLocation()
   const [files, setFiles] = useState([])
   const [previews, setPreviews] = useState([])
+  const [videoDurations, setVideoDurations] = useState([])
   const [statuses, setStatuses] = useState({})
   const [results, setResults] = useState({})
   const [isUploading, setIsUploading] = useState(false)
@@ -25,48 +26,122 @@ export default function App() {
     if (!files || files.length === 0) {
       // Cleanup all previews when files are cleared
       previews.forEach(url => {
-        if (url) URL.revokeObjectURL(url)
+        if (url && typeof url === 'string' && url.startsWith('blob:')) URL.revokeObjectURL(url)
       })
       setPreviews([])
+      setVideoDurations([])
     }
     // Cleanup on unmount
     return () => {
       previews.forEach(url => {
-        if (url) URL.revokeObjectURL(url)
+        if (url && typeof url === 'string' && url.startsWith('blob:')) URL.revokeObjectURL(url)
       })
     }
   }, [files])
 
+  const isImageName = (name) => /\.(jpe?g|png|gif|bmp|webp|svg|heic|heif|avif)$/i.test(name || '')
+  const isImageType = (type) => typeof type === 'string' && type.startsWith('image/')
+  const isVideoName = (name) => /\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(name || '')
+  const isVideoType = (type) => typeof type === 'string' && type.startsWith('video/')
+
   const fileData = useMemo(() =>
-    Array.from(files || []).map((f, idx) => ({ 
-      name: f.name, 
-      size: f.size, 
-      type: f.type,
-      preview: previews[idx]
-    })),
-    [files, previews]
+    Array.from(files || []).map((f, idx) => {
+      const isImg = isImageType(f.type) || isImageName(f.name)
+      const isVid = isVideoType(f.type) || isVideoName(f.name)
+      return ({ 
+        name: f.name, 
+        size: f.size, 
+        type: f.type,
+        isVideo: isVid,
+        preview: previews[idx],
+        duration: videoDurations[idx] || null,
+      })
+    }),
+    [files, previews, videoDurations]
   )
 
-  const handleFileDrop = (acceptedFiles) => {
+  const handleFileDrop = async (acceptedFiles) => {
     if (acceptedFiles.length === 0) return
     const currentLength = files.length
     const newFiles = [...files, ...acceptedFiles]
     
     // Generate previews immediately for new files
     const newPreviews = [...previews]
-    for (let i = 0; i < acceptedFiles.length; i++) {
-      const file = acceptedFiles[i]
-      const idx = currentLength + i
-      const isImage = file.type.startsWith('image/') || 
-                     /\.(jpe?g|png|gif|bmp|webp|svg|heic|heif|avif)$/i.test(file.name)
-      if (isImage) {
+    const newDurations = [...videoDurations]
+
+    // Helper to create a video thumbnail and get duration
+    const getVideoThumb = (file) => new Promise((resolve) => {
+      try {
         const url = URL.createObjectURL(file)
-        newPreviews[idx] = url
+        const video = document.createElement('video')
+        video.preload = 'metadata'
+        video.src = url
+        video.muted = true
+        const cleanup = () => {
+          if (url && url.startsWith('blob:')) URL.revokeObjectURL(url)
+          video.remove()
+        }
+        video.onloadedmetadata = () => {
+          const duration = Number.isFinite(video.duration) ? video.duration : 0
+          const target = duration && duration > 2 ? Math.min(1, duration / 2) : 0.1
+          const seekAndCapture = () => {
+            const canvas = document.createElement('canvas')
+            const maxW = 160
+            const scale = Math.min(1, maxW / (video.videoWidth || maxW))
+            canvas.width = Math.max(1, Math.floor((video.videoWidth || maxW) * scale))
+            canvas.height = Math.max(1, Math.floor((video.videoHeight || maxW) * scale))
+            const ctx = canvas.getContext('2d')
+            if (ctx) {
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+              try {
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.8)
+                cleanup()
+                resolve({ thumb: dataUrl, duration })
+                return
+              } catch {}
+            }
+            cleanup()
+            resolve({ thumb: null, duration })
+          }
+          const handleSeeked = () => {
+            video.removeEventListener('seeked', handleSeeked)
+            seekAndCapture()
+          }
+          video.addEventListener('seeked', handleSeeked)
+          try {
+            video.currentTime = target
+          } catch {
+            // if seek fails, capture immediately
+            video.removeEventListener('seeked', handleSeeked)
+            seekAndCapture()
+          }
+        }
+        video.onerror = () => { cleanup(); resolve({ thumb: null, duration: null }) }
+        // Append off-DOM to ensure metadata loads in some browsers
+        video.style.position = 'fixed'
+        video.style.left = '-9999px'
+        document.body.appendChild(video)
+      } catch {
+        resolve({ thumb: null, duration: null })
       }
-    }
-    
+    })
+
+    // Build promises for new files
+    const tasks = acceptedFiles.map(async (file, i) => {
+      const idx = currentLength + i
+      if (isImageType(file.type) || isImageName(file.name)) {
+        newPreviews[idx] = URL.createObjectURL(file)
+      } else if (isVideoType(file.type) || isVideoName(file.name)) {
+        const { thumb, duration } = await getVideoThumb(file)
+        newPreviews[idx] = thumb
+        newDurations[idx] = duration
+      }
+    })
+    await Promise.all(tasks)
+
     setFiles(newFiles)
     setPreviews(newPreviews)
+    setVideoDurations(newDurations)
     
     const newStatuses = { ...statuses }
     const newResults = { ...results }
@@ -79,14 +154,15 @@ export default function App() {
 
   const handleRemoveFile = (idx) => {
     // Revoke the object URL to free memory
-    if (previews[idx]) {
+    if (previews[idx] && previews[idx].startsWith && previews[idx].startsWith('blob:')) {
       URL.revokeObjectURL(previews[idx])
     }
     
     const newFiles = files.filter((_, i) => i !== idx)
     const newPreviews = previews.filter((_, i) => i !== idx)
-    setFiles(newFiles)
-    setPreviews(newPreviews)
+  setFiles(newFiles)
+  setPreviews(newPreviews)
+  setVideoDurations(videoDurations.filter((_, i) => i !== idx))
     
     // Reindex statuses and results
     const newStatuses = {}
@@ -169,6 +245,14 @@ export default function App() {
   }
 
   const doneCount = useMemo(() => Object.values(statuses).filter(s => s === 'done').length, [statuses])
+  const counts = useMemo(() => {
+    let imgs = 0, vids = 0
+    for (const f of fileData) {
+      if (f.isVideo) vids++
+      else imgs++
+    }
+    return { imgs, vids }
+  }, [fileData])
   const allDone = fileData.length > 0 && doneCount === fileData.length
   const hasUnuploadedFiles = fileData.length > 0 && doneCount < fileData.length
 
@@ -273,11 +357,10 @@ export default function App() {
                 </motion.div>
                 <div>
                   <p className="font-semibold text-slate-800 dark:text-slate-100">
-                    {fileData.length} {fileData.length === 1 ? 'image' : 'images'} selected
+                    {fileData.length} {fileData.length === 1 ? 'item' : 'items'} selected
                   </p>
                   <p className="text-sm text-slate-500 dark:text-slate-400">
-                    {doneCount > 0 && `${doneCount} uploaded • `}
-                    {(fileData.reduce((sum, p) => sum + p.size, 0) / 1024 / 1024).toFixed(2)} MB total
+                    {counts.imgs} {counts.imgs === 1 ? 'image' : 'images'} • {counts.vids} {counts.vids === 1 ? 'video' : 'videos'}{doneCount > 0 ? ` • ${doneCount} uploaded` : ''} • {(fileData.reduce((sum, p) => sum + p.size, 0) / 1024 / 1024).toFixed(2)} MB total
                   </p>
                 </div>
               </div>
@@ -336,6 +419,8 @@ export default function App() {
                   status={statuses[idx] || 'idle'}
                   result={results[idx]}
                   preview={p.preview}
+                  isVideo={p.isVideo}
+                  videoDuration={p.duration}
                   onRemove={() => handleRemoveFile(idx)}
                 />
               ))}

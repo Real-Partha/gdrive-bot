@@ -31,6 +31,7 @@ PREVIEW_EXECUTOR = ThreadPoolExecutor(max_workers=settings.preview_workers)
 
 from .utils.exif import get_capture_datetime, format_date_folder, format_time_for_name
 from .services.gdrive import DriveClient
+import tempfile
 
 app = FastAPI(title="GDrive Upload Bot API")
 
@@ -151,7 +152,7 @@ async def find_photos(
     drive = DriveClient()
     main_parent = drive.get_main_parent_folder()
 
-    # Find matching folders and list images
+    # Find matching folders and list media (images + videos)
     items: list[dict] = []
     folders: list[dict] = []
 
@@ -161,8 +162,8 @@ async def find_photos(
             if not fid:
                 continue
             folders.append({"id": fid, "name": dname})
-            imgs = drive.list_images_in_folder(fid)
-            for it in imgs:
+            media = drive.list_media_in_folder(fid)
+            for it in media:
                 it["folder"] = dname
                 items.append(it)
 
@@ -179,7 +180,50 @@ async def preview_image(file_id: str, w: int = 480, q: int = 75):
     drive = DriveClient()
 
     def _work():
-        raw = drive.download_image_bytes(file_id)
+        meta = drive.get_file_metadata(file_id)
+        mime = meta.get("mimeType", "")
+        raw = drive.download_file_bytes(file_id)
+        # If it's a video, extract a frame
+        if mime.startswith("video/"):
+            try:
+                # Write to temp file with extension hint
+                ext = ".mp4" if "/mp4" in mime or mime.endswith("mp4") else ".mov"
+                with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tf:
+                    tf.write(raw)
+                    tmp_path = tf.name
+                try:
+                    import importlib
+                    mpe = importlib.import_module("moviepy.editor")
+                    clip = mpe.VideoFileClip(tmp_path)
+                    duration = max(clip.duration or 0, 0.0)
+                    t = min(1.0, duration / 2.0) if duration > 0 else 0
+                    frame = clip.get_frame(t)  # numpy array HxWx3
+                    clip.close()
+                    # Convert to PIL and thumbnail
+                    if Image is None:
+                        # Fallback: return the raw bytes if PIL unavailable
+                        return raw, "application/octet-stream"
+                    import importlib
+                    np = importlib.import_module("numpy")
+                    im = Image.fromarray(np.asarray(frame)).convert("RGB")
+                    im.thumbnail((w, w))
+                    out = BytesIO()
+                    im.save(out, format="JPEG", quality=max(1, min(95, q)))
+                    return out.getvalue(), "image/jpeg"
+                finally:
+                    try:
+                        os.remove(tmp_path)
+                    except Exception:
+                        pass
+            except Exception:
+                # If thumbnailing fails, return placeholder solid image
+                if Image is not None:
+                    im = Image.new("RGB", (w, w), color=(30, 30, 30))
+                    out = BytesIO()
+                    im.save(out, format="JPEG", quality=70)
+                    return out.getvalue(), "image/jpeg"
+                return raw, "application/octet-stream"
+        # Else treat as image
         if Image is None:
             return raw, "image/jpeg"  # best effort; original mime may vary
         try:

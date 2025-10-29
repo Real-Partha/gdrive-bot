@@ -63,7 +63,7 @@ export default function FindPage() {
             Find Photos
           </motion.h1>
           <p className="text-slate-600 dark:text-slate-400">
-            Select a date or range to browse images from your date folders in Drive.
+            Select a date or range to browse images and videos from your date folders in Drive.
           </p>
         </motion.header>
 
@@ -86,11 +86,15 @@ export default function FindPage() {
               {loading ? 'Searching...' : 'Search Photos'}
             </Button>
           </div>
-          {folders.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 text-center text-sm text-slate-600 dark:text-slate-400">
-              Found {folders.length} folder{folders.length === 1 ? '' : 's'} with {items.length} image{items.length === 1 ? '' : 's'}
-            </div>
-          )}
+          {folders.length > 0 && (() => {
+            const vids = items.filter(it => it.isVideo).length
+            const imgs = items.length - vids
+            return (
+              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 text-center text-sm text-slate-600 dark:text-slate-400">
+                Found {folders.length} folder{folders.length === 1 ? '' : 's'} with {imgs} {imgs === 1 ? 'image' : 'images'} and {vids} {vids === 1 ? 'video' : 'videos'}
+              </div>
+            )
+          })()}
         </div>
 
         {/* Grid */}

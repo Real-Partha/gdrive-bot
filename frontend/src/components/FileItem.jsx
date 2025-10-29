@@ -2,12 +2,20 @@ import { motion } from 'framer-motion'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
 
-export function FileItem({ file, index, status, result, onRemove, preview }) {
+export function FileItem({ file, index, status, result, onRemove, preview, isVideo = false, videoDuration = null }) {
     const [imgOk, setImgOk] = useState(true)
     useEffect(() => {
         // Reset image state when preview changes
         setImgOk(true)
     }, [preview])
+    const formatDuration = (seconds) => {
+        if (!seconds || seconds <= 0) return null
+        const s = Math.floor(seconds % 60)
+        const m = Math.floor((seconds / 60) % 60)
+        const h = Math.floor(seconds / 3600)
+        const pad = (n) => String(n).padStart(2, '0')
+        return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`
+    }
     const statusConfig = {
         idle: {
             label: 'Pending',
@@ -74,7 +82,7 @@ export function FileItem({ file, index, status, result, onRemove, preview }) {
             )}
 
             <div className="relative z-10 flex items-start gap-4 pr-20">
-                {/* Image preview thumbnail */}
+                {/* Image/Video preview thumbnail */}
                 {preview && imgOk ? (
                     <motion.div
                         initial={{ opacity: 0, scale: 0.8 }}
@@ -88,6 +96,12 @@ export function FileItem({ file, index, status, result, onRemove, preview }) {
                             className="w-full h-full object-cover"
                             onError={() => setImgOk(false)}
                         />
+                        {isVideo && (
+                            <div className="absolute top-1 left-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-black/60 text-white backdrop-blur-sm">
+                                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                                {formatDuration(videoDuration) || 'video'}
+                            </div>
+                        )}
                     </motion.div>
                 ) : (
                     <motion.div
@@ -170,7 +184,7 @@ export function FileItem({ file, index, status, result, onRemove, preview }) {
                             transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                             className="text-xl"
                         >
-                            📷
+                            {isVideo ? '🎬' : '📷'}
                         </motion.span>
                         <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">
                             {file.name}

@@ -154,11 +154,10 @@ class DriveClient:
         """Return folder id if a folder with name exists under parent_id; do not create."""
         return self._find_folder(name, parent_id)
 
-    def list_images_in_folder(self, parent_id: str) -> List[dict]:
-        """List image files under a folder. Returns minimal fields for UI."""
-        # Google query: images mime types
+    def list_media_in_folder(self, parent_id: str) -> List[dict]:
+        """List image and video files under a folder. Returns fields for UI, including duration for videos."""
         q = (
-            f"'{parent_id}' in parents and trashed=false and mimeType contains 'image/'"
+            f"'{parent_id}' in parents and trashed=false and (mimeType contains 'image/' or mimeType contains 'video/')"
         )
         items: List[dict] = []
         page_token = None
@@ -168,18 +167,26 @@ class DriveClient:
                 .list(
                     q=q,
                     spaces="drive",
-                    fields="nextPageToken, files(id, name, mimeType, webViewLink)",
+                    fields=(
+                        "nextPageToken, files("
+                        "id, name, mimeType, webViewLink, videoMediaMetadata(durationMillis,width,height)"
+                        ")"
+                    ),
                     pageToken=page_token,
                 )
                 .execute()
             )
             for f in res.get("files", []):
+                vmeta = f.get("videoMediaMetadata") or {}
+                duration_ms = vmeta.get("durationMillis")
                 items.append(
                     {
                         "id": f.get("id"),
                         "name": f.get("name"),
                         "mimeType": f.get("mimeType"),
                         "webViewLink": f.get("webViewLink"),
+                        "isVideo": (f.get("mimeType", "").startswith("video/")),
+                        "durationSeconds": (int(duration_ms) / 1000.0 if duration_ms else None),
                     }
                 )
             page_token = res.get("nextPageToken")
@@ -187,8 +194,8 @@ class DriveClient:
                 break
         return items
 
-    def download_image_bytes(self, file_id: str) -> bytes:
-        """Download the original image bytes. Caller may downscale for thumbnails."""
+    def download_file_bytes(self, file_id: str) -> bytes:
+        """Download original file bytes by id."""
         from googleapiclient.http import MediaIoBaseDownload
 
         request = self.service.files().get_media(fileId=file_id)
@@ -199,3 +206,12 @@ class DriveClient:
             status, done = downloader.next_chunk()
             # Optionally, could log status.progress()
         return buf.getvalue()
+
+    def get_file_metadata(self, file_id: str) -> dict:
+        """Fetch minimal metadata including mimeType for a file id."""
+        res = (
+            self.service.files()
+            .get(fileId=file_id, fields="id, name, mimeType, videoMediaMetadata(durationMillis,width,height)")
+            .execute()
+        )
+        return res

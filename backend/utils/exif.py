@@ -7,6 +7,8 @@ from io import BytesIO
 import sys
 
 HEIC_EXTS = {".heic", ".heif", ".heics", ".avif"}
+# Image types that commonly carry EXIF readable by exifread
+IMAGE_EXIF_EXTS = {".jpg", ".jpeg", ".tif", ".tiff"}
 
 EXIF_DATE_TAGS = [
     "EXIF DateTimeOriginal",
@@ -50,8 +52,8 @@ def _fs_timestamp_datetime(p: Path) -> datetime:
 def get_capture_datetime(path: str | os.PathLike[str], fallback_ts: float | None = None) -> datetime:
     p = Path(path)
     suffix = p.suffix.lower()
-    # Try EXIF for JPEG/TIFF directly
-    if suffix not in HEIC_EXTS:
+    # Try EXIF only for JPEG/TIFF directly
+    if suffix in IMAGE_EXIF_EXTS:
         try:
             with p.open('rb') as f:
                 tags = exifread.process_file(f, details=False)
@@ -64,7 +66,7 @@ def get_capture_datetime(path: str | os.PathLike[str], fallback_ts: float | None
         except Exception:
             # Ignore and fallback
             pass
-    else:
+    elif suffix in HEIC_EXTS:
         # HEIC/HEIF/AVIF: use pillow-heif to read embedded EXIF and parse
         try:
             try:
