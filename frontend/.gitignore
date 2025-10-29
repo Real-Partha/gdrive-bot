@@ -1,0 +1,43 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Ignore environment and secrets
+.env
+*.env
+# Ignore Python/Backend secrets and tokens
+../backend/.env
+../backend/credentials.json
+../backend/token.json
+# Ignore Python cache and venv
+../backend/.venv/
+../backend/__pycache__/
+../backend/**/__pycache__/
+# Ignore node_modules and build artifacts
+node_modules/
+dist/
+build/
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
