@@ -240,3 +240,30 @@ async def preview_image(file_id: str, w: int = 480, q: int = 75):
     loop = asyncio.get_running_loop()
     data, ctype = await loop.run_in_executor(PREVIEW_EXECUTOR, _work)
     return Response(content=data, media_type=ctype)
+
+
+@app.post("/preview_local")
+async def preview_local(file: UploadFile = File(...), w: int = 320, q: int = 80):
+    """Return a resized JPEG preview for an uploaded local file (e.g., HEIC).
+
+    This is used by the frontend to preview formats the browser can't decode natively.
+    """
+    content = await file.read()  # bytes of the client-selected file
+
+    def _work():
+        if Image is None:
+            return content, "application/octet-stream"
+        try:
+            im = Image.open(BytesIO(content))
+            im = im.convert("RGB")
+            im.thumbnail((w, w))
+            out = BytesIO()
+            im.save(out, format="JPEG", quality=max(1, min(95, q)))
+            return out.getvalue(), "image/jpeg"
+        except Exception:
+            # On failure, return original bytes (may not render in browser)
+            return content, "application/octet-stream"
+
+    loop = asyncio.get_running_loop()
+    data, ctype = await loop.run_in_executor(PREVIEW_EXECUTOR, _work)
+    return Response(content=data, media_type=ctype)

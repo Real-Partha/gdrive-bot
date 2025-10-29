@@ -43,6 +43,8 @@ export default function App() {
   const isImageType = (type) => typeof type === 'string' && type.startsWith('image/')
   const isVideoName = (name) => /\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(name || '')
   const isVideoType = (type) => typeof type === 'string' && type.startsWith('video/')
+  const isHeicName = (name) => /\.(heic|heif|avif)$/i.test(name || '')
+  const isHeicType = (type) => /heic|heif|avif/i.test(type || '')
 
   const fileData = useMemo(() =>
     Array.from(files || []).map((f, idx) => {
@@ -129,12 +131,30 @@ export default function App() {
     // Build promises for new files
     const tasks = acceptedFiles.map(async (file, i) => {
       const idx = currentLength + i
-      if (isImageType(file.type) || isImageName(file.name)) {
-        newPreviews[idx] = URL.createObjectURL(file)
-      } else if (isVideoType(file.type) || isVideoName(file.name)) {
+      if (isVideoType(file.type) || isVideoName(file.name)) {
         const { thumb, duration } = await getVideoThumb(file)
         newPreviews[idx] = thumb
         newDurations[idx] = duration
+      } else if (isImageType(file.type) || isImageName(file.name)) {
+        // For HEIC/HEIF/AVIF, ask backend to generate a JPEG thumbnail
+        if (isHeicType(file.type) || isHeicName(file.name)) {
+          try {
+            const fd = new FormData()
+            fd.append('file', file)
+            const resp = await fetch(`${API_BASE}/preview_local?w=240&q=80`, { method: 'POST', body: fd })
+            if (resp.ok) {
+              const blob = await resp.blob()
+              const url = URL.createObjectURL(blob)
+              newPreviews[idx] = url
+            } else {
+              newPreviews[idx] = null
+            }
+          } catch {
+            newPreviews[idx] = null
+          }
+        } else {
+          newPreviews[idx] = URL.createObjectURL(file)
+        }
       }
     })
     await Promise.all(tasks)
