@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
 
-export function FileItem({ file, index, status, result, onRemove, preview, isVideo = false, videoDuration = null }) {
+export function FileItem({ file, index, status, result, onRemove, preview, isVideo = false, videoDuration = null, previewIsLoading = false }) {
     const [imgOk, setImgOk] = useState(true)
     useEffect(() => {
         // Reset image state when preview changes
@@ -88,7 +88,7 @@ export function FileItem({ file, index, status, result, onRemove, preview, isVid
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ duration: 0.3 }}
-                        className="shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 border-slate-200/50 dark:border-slate-700/50 shadow-md"
+                        className="relative shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 border-slate-200/50 dark:border-slate-700/50 shadow-md"
                     >
                         <img
                             src={preview}
@@ -96,6 +96,14 @@ export function FileItem({ file, index, status, result, onRemove, preview, isVid
                             className="w-full h-full object-cover"
                             onError={() => setImgOk(false)}
                         />
+                        {previewIsLoading && (
+                          <div className="absolute inset-0 bg-black/20 backdrop-blur-[1px] flex items-center justify-center">
+                            <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                            </svg>
+                          </div>
+                        )}
                         {isVideo && (
                             <div className="absolute top-1 left-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-black/60 text-white backdrop-blur-sm">
                                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
@@ -108,71 +116,25 @@ export function FileItem({ file, index, status, result, onRemove, preview, isVid
                         initial={{ opacity: 0, scale: 0.8 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ duration: 0.3 }}
-                        className="relative shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 border-slate-300/60 dark:border-slate-600/60 shadow-md bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800"
+                        className="relative shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 border-slate-300/60 dark:border-slate-600/60 shadow-md bg-slate-100 dark:bg-slate-800"
                     >
-                        {/* Animated pulsing circles */}
-                        <motion.div
-                            className="absolute inset-0 flex items-center justify-center"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                        >
-                            <motion.div
-                                className="absolute w-8 h-8 rounded-full bg-brand-400/20 dark:bg-brand-500/20"
-                                animate={{
-                                    scale: [1, 1.8, 1],
-                                    opacity: [0.6, 0, 0.6]
-                                }}
-                                transition={{
-                                    repeat: Infinity,
-                                    duration: 2,
-                                    ease: "easeInOut"
-                                }}
-                            />
-                            <motion.div
-                                className="absolute w-8 h-8 rounded-full bg-purple-400/20 dark:bg-purple-500/20"
-                                animate={{
-                                    scale: [1, 1.8, 1],
-                                    opacity: [0.6, 0, 0.6]
-                                }}
-                                transition={{
-                                    repeat: Infinity,
-                                    duration: 2,
-                                    ease: "easeInOut",
-                                    delay: 0.4
-                                }}
-                            />
-                            <motion.div
-                                className="absolute w-8 h-8 rounded-full bg-pink-400/20 dark:bg-pink-500/20"
-                                animate={{
-                                    scale: [1, 1.8, 1],
-                                    opacity: [0.6, 0, 0.6]
-                                }}
-                                transition={{
-                                    repeat: Infinity,
-                                    duration: 2,
-                                    ease: "easeInOut",
-                                    delay: 0.8
-                                }}
-                            />
-                        </motion.div>
-
-                        {/* Center icon with rotation */}
-                        <motion.div
-                            className="absolute inset-0 flex items-center justify-center"
-                            animate={{ rotate: [0, 360] }}
-                            transition={{ repeat: Infinity, duration: 20, ease: "linear" }}
-                        >
-                            <svg
-                                width="24"
-                                height="24"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                className="text-slate-500 dark:text-slate-400"
-                            >
-                                <path d="M12 4v16m8-8H4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.5" opacity="0.3" />
+                        {/* Loader for pending previews */}
+                        {previewIsLoading ? (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <svg className="animate-spin h-5 w-5 text-slate-500 dark:text-slate-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
                             </svg>
-                        </motion.div>
+                          </div>
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-slate-500 dark:text-slate-400">
+                            {isVideo ? (
+                              <img src="/video-preview.png" alt="video placeholder" className="w-full h-full object-cover" />
+                            ) : (
+                              <img src="/image-preview.png" alt="image placeholder" className="w-full h-full object-cover" />
+                            )}
+                          </div>
+                        )}
                     </motion.div>
                 )}
 

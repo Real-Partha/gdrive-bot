@@ -20,6 +20,8 @@ export default function App() {
   const [statuses, setStatuses] = useState({})
   const [results, setResults] = useState({})
   const [isUploading, setIsUploading] = useState(false)
+  const [previewsDisabled, setPreviewsDisabled] = useState(false)
+  const [previewLoading, setPreviewLoading] = useState([])
 
   // Generate previews when files change
   useEffect(() => {
@@ -46,6 +48,63 @@ export default function App() {
   const isHeicName = (name) => /\.(heic|heif|avif)$/i.test(name || '')
   const isHeicType = (type) => /heic|heif|avif/i.test(type || '')
 
+  // Create a video thumbnail and extract duration using an off-DOM <video>
+  const getVideoThumb = (file) => new Promise((resolve) => {
+    try {
+      const url = URL.createObjectURL(file)
+      const video = document.createElement('video')
+      video.preload = 'metadata'
+      video.src = url
+      video.muted = true
+      const cleanup = () => {
+        if (url && url.startsWith('blob:')) URL.revokeObjectURL(url)
+        video.remove()
+      }
+      video.onloadedmetadata = () => {
+        const duration = Number.isFinite(video.duration) ? video.duration : 0
+        const target = duration && duration > 2 ? Math.min(1, duration / 2) : 0.1
+        const seekAndCapture = () => {
+          const canvas = document.createElement('canvas')
+          const maxW = 160
+          const scale = Math.min(1, maxW / (video.videoWidth || maxW))
+          canvas.width = Math.max(1, Math.floor((video.videoWidth || maxW) * scale))
+          canvas.height = Math.max(1, Math.floor((video.videoHeight || maxW) * scale))
+          const ctx = canvas.getContext('2d')
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+            try {
+              const dataUrl = canvas.toDataURL('image/jpeg', 0.8)
+              cleanup()
+              resolve({ thumb: dataUrl, duration })
+              return
+            } catch (e) {
+              // fall-through
+            }
+          }
+          cleanup()
+          resolve({ thumb: null, duration })
+        }
+        const handleSeeked = () => {
+          video.removeEventListener('seeked', handleSeeked)
+          seekAndCapture()
+        }
+        video.addEventListener('seeked', handleSeeked)
+        try {
+          video.currentTime = target
+        } catch (e) {
+          video.removeEventListener('seeked', handleSeeked)
+          seekAndCapture()
+        }
+      }
+      video.onerror = () => { cleanup(); resolve({ thumb: null, duration: null }) }
+      video.style.position = 'fixed'
+      video.style.left = '-9999px'
+      document.body.appendChild(video)
+    } catch (e) {
+      resolve({ thumb: null, duration: null })
+    }
+  })
+
   const fileData = useMemo(() =>
     Array.from(files || []).map((f, idx) => {
       const isImg = isImageType(f.type) || isImageName(f.name)
@@ -57,87 +116,71 @@ export default function App() {
         isVideo: isVid,
         preview: previews[idx],
         duration: videoDurations[idx] || null,
+        previewIsLoading: !!previewLoading[idx],
       })
     }),
-    [files, previews, videoDurations]
+    [files, previews, videoDurations, previewLoading]
   )
 
   const handleFileDrop = async (acceptedFiles) => {
     if (acceptedFiles.length === 0) return
     const currentLength = files.length
     const newFiles = [...files, ...acceptedFiles]
-    
-    // Generate previews immediately for new files
+
+    // Extend arrays for new items
     const newPreviews = [...previews]
     const newDurations = [...videoDurations]
+    const newLoading = [...previewLoading]
 
-    // Helper to create a video thumbnail and get duration
-    const getVideoThumb = (file) => new Promise((resolve) => {
-      try {
-        const url = URL.createObjectURL(file)
-        const video = document.createElement('video')
-        video.preload = 'metadata'
-        video.src = url
-        video.muted = true
-        const cleanup = () => {
-          if (url && url.startsWith('blob:')) URL.revokeObjectURL(url)
-          video.remove()
+    // Initialize UI state immediately
+    acceptedFiles.forEach((file, i) => {
+      const idx = currentLength + i
+      const isImg = isImageType(file.type) || isImageName(file.name)
+      const isVid = isVideoType(file.type) || isVideoName(file.name)
+      if (previewsDisabled) {
+        newPreviews[idx] = isVid ? '/video-preview.png' : '/image-preview.png'
+        newDurations[idx] = null
+        newLoading[idx] = false
+      } else {
+        if (isImg) {
+          if (isHeicType(file.type) || isHeicName(file.name)) {
+            newPreviews[idx] = null
+            newLoading[idx] = true
+          } else {
+            newPreviews[idx] = URL.createObjectURL(file)
+            newLoading[idx] = false
+          }
+        } else if (isVid) {
+          newPreviews[idx] = null
+          newDurations[idx] = null
+          newLoading[idx] = true
         }
-        video.onloadedmetadata = () => {
-          const duration = Number.isFinite(video.duration) ? video.duration : 0
-          const target = duration && duration > 2 ? Math.min(1, duration / 2) : 0.1
-          const seekAndCapture = () => {
-            const canvas = document.createElement('canvas')
-            const maxW = 160
-            const scale = Math.min(1, maxW / (video.videoWidth || maxW))
-            canvas.width = Math.max(1, Math.floor((video.videoWidth || maxW) * scale))
-            canvas.height = Math.max(1, Math.floor((video.videoHeight || maxW) * scale))
-            const ctx = canvas.getContext('2d')
-            if (ctx) {
-              ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-              try {
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.8)
-                cleanup()
-                resolve({ thumb: dataUrl, duration })
-                return
-              } catch {}
-            }
-            cleanup()
-            resolve({ thumb: null, duration })
-          }
-          const handleSeeked = () => {
-            video.removeEventListener('seeked', handleSeeked)
-            seekAndCapture()
-          }
-          video.addEventListener('seeked', handleSeeked)
-          try {
-            video.currentTime = target
-          } catch {
-            // if seek fails, capture immediately
-            video.removeEventListener('seeked', handleSeeked)
-            seekAndCapture()
-          }
-        }
-        video.onerror = () => { cleanup(); resolve({ thumb: null, duration: null }) }
-        // Append off-DOM to ensure metadata loads in some browsers
-        video.style.position = 'fixed'
-        video.style.left = '-9999px'
-        document.body.appendChild(video)
-      } catch {
-        resolve({ thumb: null, duration: null })
       }
     })
 
-    // Build promises for new files
-    const tasks = acceptedFiles.map(async (file, i) => {
+    setFiles(newFiles)
+    setPreviews(newPreviews)
+    setVideoDurations(newDurations)
+    setPreviewLoading(newLoading)
+
+    // Start async work per-file
+    acceptedFiles.forEach((file, i) => {
       const idx = currentLength + i
-      if (isVideoType(file.type) || isVideoName(file.name)) {
-        const { thumb, duration } = await getVideoThumb(file)
-        newPreviews[idx] = thumb
-        newDurations[idx] = duration
-      } else if (isImageType(file.type) || isImageName(file.name)) {
-        // For HEIC/HEIF/AVIF, ask backend to generate a JPEG thumbnail
-        if (isHeicType(file.type) || isHeicName(file.name)) {
+      const isImg = isImageType(file.type) || isImageName(file.name)
+      const isVid = isVideoType(file.type) || isVideoName(file.name)
+      if (previewsDisabled) return
+      if (isVid) {
+        ;(async () => {
+          try {
+            const { thumb, duration } = await getVideoThumb(file)
+            setPreviews(prev => { const arr = [...prev]; arr[idx] = thumb; return arr })
+            setVideoDurations(prev => { const arr = [...prev]; arr[idx] = duration; return arr })
+          } finally {
+            setPreviewLoading(prev => { const arr = [...prev]; arr[idx] = false; return arr })
+          }
+        })()
+      } else if (isImg && (isHeicType(file.type) || isHeicName(file.name))) {
+        ;(async () => {
           try {
             const fd = new FormData()
             fd.append('file', file)
@@ -145,29 +188,23 @@ export default function App() {
             if (resp.ok) {
               const blob = await resp.blob()
               const url = URL.createObjectURL(blob)
-              newPreviews[idx] = url
+              setPreviews(prev => { const arr = [...prev]; arr[idx] = url; return arr })
             } else {
-              newPreviews[idx] = null
+              setPreviews(prev => { const arr = [...prev]; arr[idx] = null; return arr })
             }
-          } catch {
-            newPreviews[idx] = null
+          } catch (e) {
+            setPreviews(prev => { const arr = [...prev]; arr[idx] = null; return arr })
+          } finally {
+            setPreviewLoading(prev => { const arr = [...prev]; arr[idx] = false; return arr })
           }
-        } else {
-          newPreviews[idx] = URL.createObjectURL(file)
-        }
+        })()
       }
     })
-    await Promise.all(tasks)
 
-    setFiles(newFiles)
-    setPreviews(newPreviews)
-    setVideoDurations(newDurations)
-    
+    // Initialize upload statuses for new items
     const newStatuses = { ...statuses }
     const newResults = { ...results }
-    for (let i = 0; i < acceptedFiles.length; i++) {
-      newStatuses[currentLength + i] = 'idle'
-    }
+    for (let i = 0; i < acceptedFiles.length; i++) newStatuses[currentLength + i] = 'idle'
     setStatuses(newStatuses)
     setResults(newResults)
   }
@@ -180,26 +217,98 @@ export default function App() {
     
     const newFiles = files.filter((_, i) => i !== idx)
     const newPreviews = previews.filter((_, i) => i !== idx)
-  setFiles(newFiles)
-  setPreviews(newPreviews)
-  setVideoDurations(videoDurations.filter((_, i) => i !== idx))
-    
+    const newDur = videoDurations.filter((_, i) => i !== idx)
+    const newLoad = previewLoading.filter((_, i) => i !== idx)
+    setFiles(newFiles)
+    setPreviews(newPreviews)
+    setVideoDurations(newDur)
+    setPreviewLoading(newLoad)
+
     // Reindex statuses and results
-    const newStatuses = {}
-    const newResults = {}
+    const nextStatuses = {}
+    const nextResults = {}
     Object.keys(statuses).forEach(key => {
       const oldIdx = parseInt(key)
       if (oldIdx < idx) {
-        newStatuses[oldIdx] = statuses[oldIdx]
-        if (results[oldIdx]) newResults[oldIdx] = results[oldIdx]
+        nextStatuses[oldIdx] = statuses[oldIdx]
+        if (results[oldIdx]) nextResults[oldIdx] = results[oldIdx]
       } else if (oldIdx > idx) {
-        newStatuses[oldIdx - 1] = statuses[oldIdx]
-        if (results[oldIdx]) newResults[oldIdx - 1] = results[oldIdx]
+        nextStatuses[oldIdx - 1] = statuses[oldIdx]
+        if (results[oldIdx]) nextResults[oldIdx - 1] = results[oldIdx]
       }
     })
-    setStatuses(newStatuses)
-    setResults(newResults)
+    setStatuses(nextStatuses)
+    setResults(nextResults)
   }
+
+  // Respond to preview toggle changes for current selection
+  useEffect(() => {
+    // No files -> nothing to do
+    if (!files || files.length === 0) return
+    const apply = async () => {
+      // Revoke old blob URLs
+      previews.forEach(url => {
+        if (url && typeof url === 'string' && url.startsWith('blob:')) URL.revokeObjectURL(url)
+      })
+      const basePreviews = Array(files.length).fill(null)
+      const baseDur = Array(files.length).fill(null)
+      const baseLoading = Array(files.length).fill(false)
+      if (previewsDisabled) {
+        for (let idx = 0; idx < files.length; idx++) {
+          const f = files[idx]
+          const isVid = isVideoType(f.type) || isVideoName(f.name)
+          basePreviews[idx] = isVid ? '/video-preview.png' : '/image-preview.png'
+          baseDur[idx] = null
+          baseLoading[idx] = false
+        }
+        setPreviews(basePreviews)
+        setVideoDurations(baseDur)
+        setPreviewLoading(baseLoading)
+      } else {
+        // Regenerate previews quickly
+        setPreviews(basePreviews)
+        setVideoDurations(baseDur)
+        setPreviewLoading(baseLoading)
+        files.forEach((f, idx) => {
+          const isImg = isImageType(f.type) || isImageName(f.name)
+          const isVid = isVideoType(f.type) || isVideoName(f.name)
+          if (isImg) {
+            if (isHeicType(f.type) || isHeicName(f.name)) {
+              setPreviewLoading(prev => { const arr = [...prev]; arr[idx] = true; return arr })
+              ;(async () => {
+                try {
+                  const fd = new FormData(); fd.append('file', f)
+                  const resp = await fetch(`${API_BASE}/preview_local?w=240&q=80`, { method: 'POST', body: fd })
+                  if (resp.ok) {
+                    const blob = await resp.blob()
+                    const url = URL.createObjectURL(blob)
+                    setPreviews(prev => { const arr = [...prev]; arr[idx] = url; return arr })
+                  }
+                } finally {
+                  setPreviewLoading(prev => { const arr = [...prev]; arr[idx] = false; return arr })
+                }
+              })()
+            } else {
+              setPreviews(prev => { const arr = [...prev]; arr[idx] = URL.createObjectURL(f); return arr })
+            }
+          } else if (isVid) {
+            setPreviewLoading(prev => { const arr = [...prev]; arr[idx] = true; return arr })
+            ;(async () => {
+              try {
+                const { thumb, duration } = await getVideoThumb(f)
+                setPreviews(prev => { const arr = [...prev]; arr[idx] = thumb; return arr })
+                setVideoDurations(prev => { const arr = [...prev]; arr[idx] = duration; return arr })
+              } finally {
+                setPreviewLoading(prev => { const arr = [...prev]; arr[idx] = false; return arr })
+              }
+            })()
+          }
+        })
+      }
+    }
+    apply()
+  }
+  , [previewsDisabled])
 
   async function uploadAll() {
     if (!files || files.length === 0) return
@@ -357,6 +466,22 @@ export default function App() {
           className="mb-8"
         >
           <DropZone onDrop={handleFileDrop} disabled={isUploading} />
+          {/* Preview toggle */}
+          <div className="mt-4 flex items-center justify-center">
+            <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-white/60 dark:bg-slate-800/60 backdrop-blur-md border border-slate-200/60 dark:border-slate-700/60 shadow-sm">
+              <span className="text-sm text-slate-600 dark:text-slate-300">Placeholders</span>
+              <button
+                type="button"
+                onClick={() => setPreviewsDisabled(prev => !prev)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 ${previewsDisabled ? 'bg-slate-400/70 dark:bg-slate-600' : 'bg-brand-500'}`}
+                aria-pressed={!previewsDisabled}
+                aria-label="Toggle previews"
+              >
+                <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform duration-300 ${previewsDisabled ? 'translate-x-1' : 'translate-x-5'}`} />
+              </button>
+              <span className="text-sm text-slate-600 dark:text-slate-300">Live previews</span>
+            </div>
+          </div>
         </motion.div>
 
         {fileData.length > 0 && (
@@ -441,6 +566,7 @@ export default function App() {
                   preview={p.preview}
                   isVideo={p.isVideo}
                   videoDuration={p.duration}
+                  previewIsLoading={p.previewIsLoading}
                   onRemove={() => handleRemoveFile(idx)}
                 />
               ))}
