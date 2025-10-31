@@ -22,6 +22,7 @@ export default function App() {
   const [isUploading, setIsUploading] = useState(false)
   const [previewsDisabled, setPreviewsDisabled] = useState(false)
   const [previewLoading, setPreviewLoading] = useState([])
+  const [attempts, setAttempts] = useState({})
 
   // Generate previews when files change
   useEffect(() => {
@@ -204,9 +205,13 @@ export default function App() {
     // Initialize upload statuses for new items
     const newStatuses = { ...statuses }
     const newResults = { ...results }
+    const newAttempts = { ...attempts }
     for (let i = 0; i < acceptedFiles.length; i++) newStatuses[currentLength + i] = 'idle'
     setStatuses(newStatuses)
     setResults(newResults)
+    // initialize attempts to 0 for new indices
+    for (let i = 0; i < acceptedFiles.length; i++) newAttempts[currentLength + i] = 0
+    setAttempts(newAttempts)
   }
 
   const handleRemoveFile = (idx) => {
@@ -227,18 +232,22 @@ export default function App() {
     // Reindex statuses and results
     const nextStatuses = {}
     const nextResults = {}
+    const nextAttempts = {}
     Object.keys(statuses).forEach(key => {
       const oldIdx = parseInt(key)
       if (oldIdx < idx) {
         nextStatuses[oldIdx] = statuses[oldIdx]
         if (results[oldIdx]) nextResults[oldIdx] = results[oldIdx]
+        if (typeof attempts[oldIdx] !== 'undefined') nextAttempts[oldIdx] = attempts[oldIdx]
       } else if (oldIdx > idx) {
         nextStatuses[oldIdx - 1] = statuses[oldIdx]
         if (results[oldIdx]) nextResults[oldIdx - 1] = results[oldIdx]
+        if (typeof attempts[oldIdx] !== 'undefined') nextAttempts[oldIdx - 1] = attempts[oldIdx]
       }
     })
     setStatuses(nextStatuses)
     setResults(nextResults)
+    setAttempts(nextAttempts)
   }
 
   // Respond to preview toggle changes for current selection
@@ -319,32 +328,59 @@ export default function App() {
       const file = files[i]
       if (!file) return
       if ((statuses[i] || '') === 'done') return
-      const startTime = Date.now()
+      let attempt = Number.isInteger(attempts[i]) ? attempts[i] : 0
       // mark uploading
       setStatuses(prev => ({ ...prev, [i]: 'uploading' }))
-      const fd = new FormData()
-      fd.append('files', file)
-      if (typeof file.lastModified === 'number') {
-        fd.append('lastModified', String(file.lastModified))
-      }
-      try {
+      const doOnce = async () => {
+        const startTime = Date.now()
+        const fd = new FormData()
+        fd.append('files', file)
+        if (typeof file.lastModified === 'number') {
+          fd.append('lastModified', String(file.lastModified))
+        }
         const resp = await fetch(`${API_BASE}/upload`, { method: 'POST', body: fd })
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
         const data = await resp.json()
         const res = Array.isArray(data.results) ? data.results[0] : null
         const endTime = Date.now()
         const uploadTime = ((endTime - startTime) / 1000).toFixed(2) + 's'
+        return { res, uploadTime }
+      }
 
-        if (res && res.status === 'ok') {
-          setStatuses(prev => ({ ...prev, [i]: 'done' }))
-          setResults(prev => ({ ...prev, [i]: { ...res, uploadTime } }))
-        } else {
+      while (true) {
+        try {
+          const { res, uploadTime } = await doOnce()
+          if (res && res.status === 'ok') {
+            setStatuses(prev => ({ ...prev, [i]: 'done' }))
+            setResults(prev => ({ ...prev, [i]: { ...res, uploadTime } }))
+            // reset attempts on success
+            setAttempts(prev => { const n = { ...prev }; delete n[i]; return n })
+            break
+          } else {
+            const errMsg = (res && res.error) || 'Upload failed'
+            if (attempt < 1) {
+              attempt += 1
+              setAttempts(prev => ({ ...prev, [i]: attempt }))
+              // brief backoff before retry
+              await new Promise(r => setTimeout(r, 1500))
+              // continue loop to retry
+              continue
+            }
+            setStatuses(prev => ({ ...prev, [i]: 'error' }))
+            setResults(prev => ({ ...prev, [i]: { error: errMsg } }))
+            break
+          }
+        } catch (err) {
+          if (attempt < 1) {
+            attempt += 1
+            setAttempts(prev => ({ ...prev, [i]: attempt }))
+            await new Promise(r => setTimeout(r, 1500))
+            continue
+          }
           setStatuses(prev => ({ ...prev, [i]: 'error' }))
-          setResults(prev => ({ ...prev, [i]: { error: (res && res.error) || 'Upload failed' } }))
+          setResults(prev => ({ ...prev, [i]: { error: String(err) } }))
+          break
         }
-      } catch (err) {
-        setStatuses(prev => ({ ...prev, [i]: 'error' }))
-        setResults(prev => ({ ...prev, [i]: { error: String(err) } }))
       }
     }
 
@@ -370,6 +406,81 @@ export default function App() {
       await Promise.all(workers)
     } finally {
       setIsUploading(false)
+    }
+  }
+
+  // Manual per-item retry handler
+  const handleRetryUpload = async (idx) => {
+    if (!files[idx]) return
+    if (statuses[idx] === 'uploading') return
+    // clear error and reset attempt counter
+    setResults(prev => { const n = { ...prev }; delete n[idx]; return n })
+    setAttempts(prev => ({ ...prev, [idx]: 0 }))
+    await (async () => {
+      // Run single upload for this index
+      await (async (i) => {
+        const file = files[i]
+        if (!file) return
+        // mark as idle then call uploadOne which will set uploading and perform retries
+        setStatuses(prev => ({ ...prev, [i]: 'idle' }))
+        await uploadAllSingle(i)
+      })(idx)
+    })()
+  }
+
+  // small helper to upload a single index using the same logic as workers
+  const uploadAllSingle = async (i) => {
+    // Inline the same uploadOne used in uploadAll
+    const file = files[i]
+    if (!file) return
+    let attempt = Number.isInteger(attempts[i]) ? attempts[i] : 0
+    setStatuses(prev => ({ ...prev, [i]: 'uploading' }))
+    const doOnce = async () => {
+      const startTime = Date.now()
+      const fd = new FormData()
+      fd.append('files', file)
+      if (typeof file.lastModified === 'number') {
+        fd.append('lastModified', String(file.lastModified))
+      }
+      const resp = await fetch(`${API_BASE}/upload`, { method: 'POST', body: fd })
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      const data = await resp.json()
+      const res = Array.isArray(data.results) ? data.results[0] : null
+      const endTime = Date.now()
+      const uploadTime = ((endTime - startTime) / 1000).toFixed(2) + 's'
+      return { res, uploadTime }
+    }
+    while (true) {
+      try {
+        const { res, uploadTime } = await doOnce()
+        if (res && res.status === 'ok') {
+          setStatuses(prev => ({ ...prev, [i]: 'done' }))
+          setResults(prev => ({ ...prev, [i]: { ...res, uploadTime } }))
+          setAttempts(prev => { const n = { ...prev }; delete n[i]; return n })
+          break
+        } else {
+          const errMsg = (res && res.error) || 'Upload failed'
+          if (attempt < 1) {
+            attempt += 1
+            setAttempts(prev => ({ ...prev, [i]: attempt }))
+            await new Promise(r => setTimeout(r, 1500))
+            continue
+          }
+          setStatuses(prev => ({ ...prev, [i]: 'error' }))
+          setResults(prev => ({ ...prev, [i]: { error: errMsg } }))
+          break
+        }
+      } catch (err) {
+        if (attempt < 1) {
+          attempt += 1
+          setAttempts(prev => ({ ...prev, [i]: attempt }))
+          await new Promise(r => setTimeout(r, 1500))
+          continue
+        }
+        setStatuses(prev => ({ ...prev, [i]: 'error' }))
+        setResults(prev => ({ ...prev, [i]: { error: String(err) } }))
+        break
+      }
     }
   }
 
@@ -568,6 +679,7 @@ export default function App() {
                   videoDuration={p.duration}
                   previewIsLoading={p.previewIsLoading}
                   onRemove={() => handleRemoveFile(idx)}
+                  onRetry={() => handleRetryUpload(idx)}
                 />
               ))}
             </ul>

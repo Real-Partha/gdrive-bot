@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { clsx } from 'clsx'
 import { useState, useEffect } from 'react'
 
-export function FileItem({ file, index, status, result, onRemove, preview, isVideo = false, videoDuration = null, previewIsLoading = false }) {
+export function FileItem({ file, index, status, result, onRemove, onRetry, preview, isVideo = false, videoDuration = null, previewIsLoading = false }) {
     const [imgOk, setImgOk] = useState(true)
     useEffect(() => {
         // Reset image state when preview changes
@@ -78,6 +78,27 @@ export function FileItem({ file, index, status, result, onRemove, preview, isVid
                     <svg className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
+                </motion.button>
+            )}
+
+            {/* Retry button when error */}
+            {status === 'error' && onRetry && (
+                <motion.button
+                    initial={{ opacity: 0, scale: 0 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.2 }}
+                    onClick={onRetry}
+                    className={clsx(
+                        'absolute top-2 right-12 z-20 h-7 px-2 rounded-md flex items-center justify-center gap-1',
+                        'bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm',
+                        'border border-slate-300/60 dark:border-slate-600/60',
+                        'hover:bg-white dark:hover:bg-slate-700/60',
+                        'transition-all duration-200 hover:scale-105 text-slate-700 dark:text-slate-200'
+                    )}
+                    aria-label="Retry upload"
+                >
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0114.13-3.36L23 10"></path><path d="M20.49 15a9 9 0 01-14.13 3.36L1 14"></path></svg>
+                    <span className="text-xs font-medium">Retry</span>
                 </motion.button>
             )}
 
@@ -175,7 +196,7 @@ export function FileItem({ file, index, status, result, onRemove, preview, isVid
                             >
                                 ⚠️
                             </motion.span>
-                            Preview not available (HEIC?)
+                            Preview not available
                         </motion.div>
                     )}
 
