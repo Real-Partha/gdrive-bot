@@ -3,6 +3,8 @@ from pathlib import Path
 from typing import Optional, Dict, Tuple, List
 import io
 import threading
+import time
+import random
 
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -138,16 +140,32 @@ class DriveClient:
             while self._file_exists_in_folder(final_name, parent_id):
                 final_name = f"{base}-{counter}{ext}"
                 counter += 1
-        media = MediaFileUpload(str(local_path), resumable=False)
+        # Use resumable, chunked upload for robustness with large files
+        # Google Drive API requires chunk sizes to be multiples of 256KB. We'll use 10MB.
+        chunk_size = 10 * 1024 * 1024
+        media = MediaFileUpload(str(local_path), chunksize=chunk_size, resumable=True)
         body = {"name": final_name}
         if parent_id:
             body["parents"] = [parent_id]
-        file = (
-            self.service.files()
-            .create(body=body, media_body=media, fields="id, name, webViewLink")
-            .execute()
-        )
-        return file
+        request = self.service.files().create(body=body, media_body=media, fields="id, name, webViewLink")
+
+        response = None
+        max_errors = 8
+        consecutive_errors = 0
+        while response is None:
+            try:
+                status, response = request.next_chunk()
+                # Optionally, one could log: status and status.progress() if status is not None
+                consecutive_errors = 0
+            except Exception as e:
+                consecutive_errors += 1
+                if consecutive_errors > max_errors:
+                    raise e
+                # Exponential backoff with jitter
+                sleep_secs = min(30, (2 ** consecutive_errors)) + random.random()
+                time.sleep(sleep_secs)
+                # Loop continues; request maintains resumable session
+        return response
 
     # ---------- Public helpers for search/browse ----------
     def find_folder_id(self, name: str, parent_id: Optional[str]) -> Optional[str]:

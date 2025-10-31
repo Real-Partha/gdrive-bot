@@ -65,10 +65,13 @@ async def upload(
         temp_dir = Path(tempfile.mkdtemp(prefix="gdupload_"))
         temp_path = temp_dir / f.filename
         try:
-            # Save upload to temp
+            # Save upload to temp in chunks to avoid large memory usage
             with temp_path.open("wb") as out:
-                content = await f.read()  # type: ignore[arg-type]
-                out.write(content)
+                while True:
+                    chunk = await f.read(1024 * 1024)  # 1MB chunks
+                    if not chunk:
+                        break
+                    out.write(chunk)
 
             # Determine client-provided modified time (ms) if available
             lm_ts: float | None = None
