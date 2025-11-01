@@ -166,7 +166,7 @@ export function DateTimePicker({ value, onChange, label }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="absolute z-[100] mt-2 w-full md:w-80 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl backdrop-blur-xl"
+            className="absolute z-[100] mt-2 w-full md:w-[520px] p-4 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl backdrop-blur-xl"
           >
             {/* Month/Year header */}
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200 dark:border-slate-700">
@@ -237,72 +237,77 @@ export function DateTimePicker({ value, onChange, label }) {
               ))}
             </div>
 
-            {/* Calendar grid */}
-            <div className="grid grid-cols-7 gap-1 mb-4">
-              {blanks.map(i => (
-                <div key={`blank-${i}`} />
-              ))}
-              {days.map(day => {
-                const selected = isSelectedDay(day)
-                const today = isToday(day)
-                return (
-                  <motion.button
-                    key={day}
-                    type="button"
-                    onClick={() => handleDayClick(day)}
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    className={`
-                      aspect-square rounded-lg text-sm font-medium transition-all
-                      ${selected 
-                        ? 'bg-gradient-to-br from-brand-500 to-purple-600 text-white shadow-lg shadow-brand-500/30' 
-                        : today
-                          ? 'bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 border border-brand-300 dark:border-brand-700'
-                          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                      }
-                    `}
-                  >
-                    {day}
-                  </motion.button>
-                )
-              })}
-            </div>
-
-            {/* Time picker */}
-            <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
-              <div className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2 text-center">
-                Select Time
+            {/* Main content: calendar + time side by side */}
+            <div className="flex flex-col md:flex-row gap-4">
+              {/* Calendar grid */}
+              <div className="flex-1">
+                <div className="grid grid-cols-7 gap-1">
+                  {blanks.map(i => (
+                    <div key={`blank-${i}`} />
+                  ))}
+                  {days.map(day => {
+                    const selected = isSelectedDay(day)
+                    const today = isToday(day)
+                    return (
+                      <motion.button
+                        key={day}
+                        type="button"
+                        onClick={() => handleDayClick(day)}
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        className={`
+                          aspect-square rounded-lg text-sm font-medium transition-all
+                          ${selected 
+                            ? 'bg-gradient-to-br from-brand-500 to-purple-600 text-white shadow-lg shadow-brand-500/30' 
+                            : today
+                              ? 'bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 border border-brand-300 dark:border-brand-700'
+                              : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }
+                        `}
+                      >
+                        {day}
+                      </motion.button>
+                    )
+                  })}
+                </div>
               </div>
-              <div className="flex items-center justify-center gap-3">
-                {/* Hour */}
-                <div className="flex flex-col items-center">
-                  <motion.button type="button" onClick={incHour} whileHover={{scale:1.1}} whileTap={{scale:0.9}} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
-                  </motion.button>
-                  <div className="w-12 text-center text-lg font-bold text-slate-800 dark:text-slate-100 my-1 tabular-nums">
-                    {String(timeHour).padStart(2,'0')}
+
+              {/* Time picker */}
+              <div className="flex flex-col justify-center items-center border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-700 pt-3 md:pt-0 md:pl-4">
+                <div className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-3 text-center">
+                  Select Time
+                </div>
+                <div className="flex items-center justify-center gap-3">
+                  {/* Hour */}
+                  <div className="flex flex-col items-center">
+                    <motion.button type="button" onClick={incHour} whileHover={{scale:1.1}} whileTap={{scale:0.9}} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                    </motion.button>
+                    <div className="w-12 text-center text-lg font-bold text-slate-800 dark:text-slate-100 my-1 tabular-nums">
+                      {String(timeHour).padStart(2,'0')}
+                    </div>
+                    <motion.button type="button" onClick={decHour} whileHover={{scale:1.1}} whileTap={{scale:0.9}} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </motion.button>
                   </div>
-                  <motion.button type="button" onClick={decHour} whileHover={{scale:1.1}} whileTap={{scale:0.9}} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                  <div className="text-2xl font-bold text-slate-400 dark:text-slate-600">:</div>
+                  {/* Minute */}
+                  <div className="flex flex-col items-center">
+                    <motion.button type="button" onClick={incMinute} whileHover={{scale:1.1}} whileTap={{scale:0.9}} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                    </motion.button>
+                    <div className="w-12 text-center text-lg font-bold text-slate-800 dark:text-slate-100 my-1 tabular-nums">
+                      {String(timeMinute).padStart(2,'0')}
+                    </div>
+                    <motion.button type="button" onClick={decMinute} whileHover={{scale:1.1}} whileTap={{scale:0.9}} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </motion.button>
+                  </div>
+                  {/* Period */}
+                  <motion.button type="button" onClick={togglePeriod} whileHover={{scale:1.05}} whileTap={{scale:0.95}} className="ml-2 px-3 py-2 rounded-lg bg-gradient-to-br from-brand-500 to-purple-600 text-white font-bold text-sm shadow-md">
+                    {timePeriod}
                   </motion.button>
                 </div>
-                <div className="text-2xl font-bold text-slate-400 dark:text-slate-600">:</div>
-                {/* Minute */}
-                <div className="flex flex-col items-center">
-                  <motion.button type="button" onClick={incMinute} whileHover={{scale:1.1}} whileTap={{scale:0.9}} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
-                  </motion.button>
-                  <div className="w-12 text-center text-lg font-bold text-slate-800 dark:text-slate-100 my-1 tabular-nums">
-                    {String(timeMinute).padStart(2,'0')}
-                  </div>
-                  <motion.button type="button" onClick={decMinute} whileHover={{scale:1.1}} whileTap={{scale:0.9}} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                  </motion.button>
-                </div>
-                {/* Period */}
-                <motion.button type="button" onClick={togglePeriod} whileHover={{scale:1.05}} whileTap={{scale:0.95}} className="ml-2 px-3 py-2 rounded-lg bg-gradient-to-br from-brand-500 to-purple-600 text-white font-bold text-sm shadow-md">
-                  {timePeriod}
-                </motion.button>
               </div>
             </div>
           </motion.div>

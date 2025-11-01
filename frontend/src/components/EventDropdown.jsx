@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 export function EventDropdown({ events, selected, onSelectionChange, maxSelected = 5, onDelete }) {
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [deletingId, setDeletingId] = useState(null)
   const containerRef = useRef(null)
 
   // Close on outside click
@@ -40,6 +41,33 @@ export function EventDropdown({ events, selected, onSelectionChange, maxSelected
   }
 
   const selectedEvents = events.filter(ev => selected.includes(ev.id))
+
+  const formatDateTime = (isoStr) => {
+    try {
+      const dt = new Date(isoStr)
+      const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+      const day = dt.getDate()
+      const month = months[dt.getMonth()]
+      const year = dt.getFullYear()
+      let hour = dt.getHours()
+      const minute = dt.getMinutes()
+      const period = hour >= 12 ? 'PM' : 'AM'
+      if (hour === 0) hour = 12
+      else if (hour > 12) hour -= 12
+      return `${day} ${month} ${year} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')} ${period}`
+    } catch (e) {
+      return isoStr
+    }
+  }
+
+  const handleDelete = async (id) => {
+    setDeletingId(id)
+    try {
+      await onDelete(id)
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   return (
     <div ref={containerRef} className="relative">
@@ -146,23 +174,31 @@ export function EventDropdown({ events, selected, onSelectionChange, maxSelected
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="font-medium text-slate-800 dark:text-slate-100 truncate">{ev.name}</div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                              {ev.start.replace('T', ' ')} → {ev.end.replace('T', ' ')}
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                              {formatDateTime(ev.start)} → {formatDateTime(ev.end)}
                             </div>
                           </div>
                         </div>
                         {/* Delete button */}
                         <motion.button
                           type="button"
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                          onClick={(e) => { e.stopPropagation(); onDelete(ev.id) }}
-                          className="flex-shrink-0 p-1.5 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-400 transition-colors"
+                          whileHover={{ scale: deletingId === ev.id ? 1 : 1.1 }}
+                          whileTap={{ scale: deletingId === ev.id ? 1 : 0.9 }}
+                          onClick={(e) => { e.stopPropagation(); handleDelete(ev.id) }}
+                          disabled={deletingId === ev.id}
+                          className="flex-shrink-0 p-1.5 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Delete event"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
+                          {deletingId === ev.id ? (
+                            <svg className="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                            </svg>
+                          ) : (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          )}
                         </motion.button>
                       </motion.li>
                     )
