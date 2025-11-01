@@ -253,42 +253,33 @@ export function FileItem({ file, index, status, result, onRemove, onRetry, previ
                     )}
                 >
                     {status === 'done' ? (
-                        // Animated checkmark with circle
+                        // Animated checkmark with continuous drawing effect
                         <div className="relative w-5 h-5 flex items-center justify-center">
+                            {/* Continuously animating checkmark stroke */}
                             <motion.svg
-                                className="absolute inset-0 w-5 h-5"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                initial={{ pathLength: 0, opacity: 0 }}
-                                animate={{ pathLength: 1, opacity: 1 }}
-                                transition={{ duration: 0.5, ease: "easeInOut" }}
-                            >
-                                <motion.circle
-                                    cx="12"
-                                    cy="12"
-                                    r="10"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    fill="none"
-                                    initial={{ pathLength: 0, rotate: -90 }}
-                                    animate={{ pathLength: 1, rotate: 0 }}
-                                    transition={{ duration: 0.6, ease: "easeOut" }}
-                                    style={{ originX: "50%", originY: "50%" }}
-                                />
-                            </motion.svg>
-                            <motion.svg
-                                className="relative w-3 h-3 text-white"
+                                className="relative w-5 h-5 text-white"
                                 viewBox="0 0 24 24"
                                 fill="none"
                                 stroke="currentColor"
                                 strokeWidth="3"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
-                                initial={{ pathLength: 0, opacity: 0 }}
-                                animate={{ pathLength: 1, opacity: 1 }}
-                                transition={{ duration: 0.3, delay: 0.3, ease: "easeOut" }}
                             >
-                                <motion.path d="M20 6L9 17l-5-5" />
+                                <motion.path 
+                                    d="M20 6L9 17l-5-5"
+                                    initial={{ pathLength: 0, opacity: 0 }}
+                                    animate={{ 
+                                        pathLength: [0, 1, 1, 0],
+                                        opacity: [0, 1, 1, 0]
+                                    }}
+                                    transition={{
+                                        duration: 2,
+                                        times: [0, 0.4, 0.6, 1],
+                                        repeat: Infinity,
+                                        ease: "easeInOut",
+                                        delay: 0.3
+                                    }}
+                                />
                             </motion.svg>
                         </div>
                     ) : (
