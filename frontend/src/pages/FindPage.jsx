@@ -6,7 +6,7 @@ import { DatePicker } from '../components/DatePicker'
 import { DateTimePicker } from '../components/DateTimePicker'
 import { EventDropdown } from '../components/EventDropdown'
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_BASE || window.location.origin
 
 export default function FindPage() {
   const today = new Date().toISOString().slice(0, 10)

@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
+const API_BASE = import.meta.env.VITE_API_BASE || window.location.origin
+
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
@@ -116,7 +118,7 @@ export function GalleryGrid({ items = [] }) {
                           <div className="aspect-square w-full relative bg-slate-100 dark:bg-slate-900">
                             <img
                               decoding="async"
-                              src={`http://localhost:8000/preview/${it.id}`}
+                              src={`${API_BASE}/preview/${it.id}`}
                               alt={it.name}
                               className="absolute inset-0 w-full h-full object-cover"
                             />

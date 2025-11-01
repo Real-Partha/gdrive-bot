@@ -10,13 +10,29 @@ from .routes.events import router as events_router
 
 app = FastAPI(title="GDrive Upload Bot API")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[settings.frontend_origin],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Materialize any secret files provided via env vars (credentials/token)
+try:
+    settings.ensure_secret_files()
+except Exception:
+    # Non-fatal; authorization will error later if missing
+    pass
+
+if getattr(settings, "frontend_origin_regex", None):
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=settings.frontend_origin_regex,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[settings.frontend_origin],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
 @app.get("/health")

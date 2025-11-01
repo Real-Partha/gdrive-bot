@@ -8,7 +8,7 @@ import { Link, useLocation } from 'react-router-dom'
 import FindPage from './pages/FindPage'
 import './index.css'
 
-const API_BASE = 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_BASE || window.location.origin
 const CONCURRENCY = 12 // adjust between 10-20 as needed
 
 export default function App() {
