@@ -20,7 +20,7 @@ export default function App() {
   const [statuses, setStatuses] = useState({})
   const [results, setResults] = useState({})
   const [isUploading, setIsUploading] = useState(false)
-  const [previewsDisabled, setPreviewsDisabled] = useState(false)
+  const [previewsDisabled, setPreviewsDisabled] = useState(true)
   const [previewLoading, setPreviewLoading] = useState([])
   const [attempts, setAttempts] = useState({})
 
