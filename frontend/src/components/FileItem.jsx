@@ -160,16 +160,16 @@ export function FileItem({ file, index, status, result, onRemove, onRetry, previ
                 )}
 
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-start gap-2 mb-1">
                         <motion.span
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
                             transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                            className="text-xl"
+                            className="text-xl shrink-0 mt-0.5"
                         >
                             {isVideo ? '🎬' : '📷'}
                         </motion.span>
-                        <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">
+                        <p className="font-semibold text-slate-800 dark:text-slate-100 line-clamp-2 break-words pr-24">
                             {file.name}
                         </p>
                     </div>
@@ -241,14 +241,16 @@ export function FileItem({ file, index, status, result, onRemove, onRetry, previ
                     )}
                 </div>
 
-                {/* Status badge - positioned absolutely on the right */}
+                {/* Status badge - positioned based on status */}
                 <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ type: 'spring', stiffness: 400, damping: 25, delay: 0.1 }}
                     className={clsx(
-                        'absolute top-1/2 right-3 -translate-y-1/2',
-                        'shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5',
+                        'absolute shrink-0 rounded-lg text-xs font-bold flex items-center gap-1.5',
+                        status === 'uploading' 
+                            ? 'top-2 right-12 px-2 py-1 z-10' 
+                            : 'top-1/2 right-3 -translate-y-1/2 px-3 py-1.5',
                         config.color
                     )}
                 >
