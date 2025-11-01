@@ -6,6 +6,7 @@ from .config import settings
 from .routes.upload import router as upload_router
 from .routes.find import router as find_router
 from .routes.utils import router as utils_router
+from .routes.events import router as events_router
 
 app = FastAPI(title="GDrive Upload Bot API")
 
@@ -27,3 +28,4 @@ async def health():
 app.include_router(upload_router)
 app.include_router(find_router)
 app.include_router(utils_router)
+app.include_router(events_router)
