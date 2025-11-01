@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '../components/Button'
 import { GalleryGrid } from '../components/GalleryGrid'
 import { DatePicker } from '../components/DatePicker'
@@ -161,87 +161,115 @@ export default function FindPage() {
         <div className="mb-6 p-6 rounded-2xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-xl border border-slate-200/50 dark:border-slate-700/50 relative z-[101]">
           {/* Mode switch */}
           <div className="flex items-center justify-center gap-4 mb-5">
-            <button onClick={() => setMode('date')} className={`px-4 py-2 rounded-lg border ${mode==='date' ? 'bg-brand-500 text-white border-brand-500' : 'bg-white/70 dark:bg-slate-800/70 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-600'}`}>By Date</button>
-            <button onClick={() => setMode('events')} className={`px-4 py-2 rounded-lg border ${mode==='events' ? 'bg-brand-500 text-white border-brand-500' : 'bg-white/70 dark:bg-slate-800/70 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-600'}`}>By Events</button>
+            <motion.button
+              onClick={() => setMode('date')}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className={`px-6 py-2.5 rounded-lg border font-medium transition-all duration-300 ${mode==='date' ? 'bg-gradient-to-r from-brand-500 to-purple-600 text-white border-brand-500 shadow-lg shadow-brand-500/30' : 'bg-white/70 dark:bg-slate-800/70 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-600 hover:border-brand-400'}`}
+            >
+              By Date
+            </motion.button>
+            <motion.button
+              onClick={() => setMode('events')}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className={`px-6 py-2.5 rounded-lg border font-medium transition-all duration-300 ${mode==='events' ? 'bg-gradient-to-r from-brand-500 to-purple-600 text-white border-brand-500 shadow-lg shadow-brand-500/30' : 'bg-white/70 dark:bg-slate-800/70 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-600 hover:border-brand-400'}`}
+            >
+              By Events
+            </motion.button>
           </div>
 
-          {mode === 'date' ? (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <DatePicker label="Start date" value={startDate} onChange={setStartDate} />
-                <DatePicker label="End date" value={endDate} onChange={setEndDate} />
-              </div>
-              <div className="flex justify-center">
-                <Button onClick={onSearch} loading={loading} variant="primary" className="px-8">
-                  {loading ? 'Searching...' : 'Search Photos'}
-                </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Add event form */}
-              <div className="mb-4 p-4 rounded-xl bg-gradient-to-br from-brand-50 to-purple-50 dark:from-slate-800/50 dark:to-slate-900/50 border border-brand-200 dark:border-slate-700">
-                <div className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Add New Event</div>
-                <div className="grid grid-cols-1 gap-3 mb-3">
-                  <input 
-                    value={evName} 
-                    onChange={e=>setEvName(e.target.value)} 
-                    placeholder="Event name (e.g., Birthday Party)" 
-                    className="px-4 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <DateTimePicker label="Start" value={evStart} onChange={setEvStart} />
-                    <DateTimePicker label="End" value={evEnd} onChange={setEvEnd} />
-                  </div>
+          <AnimatePresence mode="wait">
+            {mode === 'date' ? (
+              <motion.div
+                key="date-mode"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.3, ease: "easeInOut" }}
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <DatePicker label="Start date" value={startDate} onChange={setStartDate} />
+                  <DatePicker label="End date" value={endDate} onChange={setEndDate} />
                 </div>
-                <Button 
-                  onClick={onAddEvent} 
-                  disabled={!evName||!evStart||!evEnd||addingEvent} 
-                  loading={addingEvent}
-                  variant="primary"
-                  className="w-full"
-                >
-                  {addingEvent ? 'Adding...' : 'Add Event'}
-                </Button>
-              </div>
-
-              {/* Event selection dropdown */}
-              <div className="mb-4">
-                <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Select Events (up to {MAX_SELECTED_EVENTS})
+                <div className="flex justify-center">
+                  <Button onClick={onSearch} loading={loading} variant="primary" className="px-8">
+                    {loading ? 'Searching...' : 'Search Photos'}
+                  </Button>
                 </div>
-                {evLoading ? (
-                  <div className="p-8 text-center text-slate-500">
-                    <svg className="animate-spin h-8 w-8 mx-auto mb-2 text-brand-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                    </svg>
-                    Loading events...
+              </motion.div>
+            ) : (
+              <motion.div
+                key="events-mode"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3, ease: "easeInOut" }}
+              >
+                {/* Add event form */}
+                <div className="mb-4 p-4 rounded-xl bg-gradient-to-br from-brand-50 to-purple-50 dark:from-slate-800/50 dark:to-slate-900/50 border border-brand-200 dark:border-slate-700">
+                  <div className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Add New Event</div>
+                  <div className="grid grid-cols-1 gap-3 mb-3">
+                    <input 
+                      value={evName} 
+                      onChange={e=>setEvName(e.target.value)} 
+                      placeholder="Event name (e.g., Birthday Party)" 
+                      className="px-4 py-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <DateTimePicker label="Start" value={evStart} onChange={setEvStart} />
+                      <DateTimePicker label="End" value={evEnd} onChange={setEvEnd} />
+                    </div>
                   </div>
-                ) : (
-                  <EventDropdown 
-                    events={events}
-                    selected={selectedEventIds}
-                    onSelectionChange={setSelectedEventIds}
-                    maxSelected={MAX_SELECTED_EVENTS}
-                    onDelete={onDeleteEvent}
-                  />
-                )}
-              </div>
+                  <Button 
+                    onClick={onAddEvent} 
+                    disabled={!evName||!evStart||!evEnd||addingEvent} 
+                    loading={addingEvent}
+                    variant="primary"
+                    className="w-full"
+                  >
+                    {addingEvent ? 'Adding...' : 'Add Event'}
+                  </Button>
+                </div>
 
-              <div className="flex justify-center">
-                <Button 
-                  onClick={onSearchEvents} 
-                  loading={loading} 
-                  disabled={selectedEventIds.length === 0}
-                  variant="primary" 
-                  className="px-8"
-                >
-                  {loading ? 'Searching...' : 'Search by Events'}
-                </Button>
-              </div>
-            </>
-          )}
+                {/* Event selection dropdown */}
+                <div className="mb-4">
+                  <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Select Events (up to {MAX_SELECTED_EVENTS})
+                  </div>
+                  {evLoading ? (
+                    <div className="p-8 text-center text-slate-500">
+                      <svg className="animate-spin h-8 w-8 mx-auto mb-2 text-brand-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                      </svg>
+                      Loading events...
+                    </div>
+                  ) : (
+                    <EventDropdown 
+                      events={events}
+                      selected={selectedEventIds}
+                      onSelectionChange={setSelectedEventIds}
+                      maxSelected={MAX_SELECTED_EVENTS}
+                      onDelete={onDeleteEvent}
+                    />
+                  )}
+                </div>
+
+                <div className="flex justify-center">
+                  <Button 
+                    onClick={onSearchEvents} 
+                    loading={loading} 
+                    disabled={selectedEventIds.length === 0}
+                    variant="primary" 
+                    className="px-8"
+                  >
+                    {loading ? 'Searching...' : 'Search by Events'}
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {folders.length > 0 && (
             <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 text-center text-sm text-slate-600 dark:text-slate-400">
